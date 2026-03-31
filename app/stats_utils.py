@@ -103,8 +103,6 @@ def calculate_var_from_returns(
     """
     alpha = 1.0 - confidence_level
     var_return = float(returns.quantile(alpha))
-
-    # 損失額として見せたいので正の値に変換
     var_amount = -var_return * investment_amount
     return var_return, var_amount
 
@@ -129,14 +127,6 @@ def calculate_distribution_shape_metrics(data: np.ndarray | pd.Series) -> tuple[
     """
     Calculate skewness and excess kurtosis.
     歪度と超過尖度を計算する。
-
-    Notes
-    -----
-    - skewness:
-        0 に近いほど左右対称
-    - excess kurtosis:
-        0 に近いほど正規分布に近い尖度
-        正規分布の excess kurtosis は 0
     """
     array = np.asarray(data, dtype=float)
     skewness = float(skew(array, bias=False))
@@ -149,7 +139,6 @@ def interpret_shape_metrics(skewness: float, excess_kurt: float) -> str:
     Provide a simple textual interpretation of skewness and kurtosis.
     歪度・尖度の簡易解釈を返す。
     """
-    # 歪度の解釈
     if skewness > 0.5:
         skew_part = "right-skewed / 右に歪んだ分布"
     elif skewness < -0.5:
@@ -157,7 +146,6 @@ def interpret_shape_metrics(skewness: float, excess_kurt: float) -> str:
     else:
         skew_part = "roughly symmetric / おおむね対称"
 
-    # 超過尖度の解釈
     if excess_kurt > 1.0:
         kurt_part = "fat-tailed / 裾が厚い"
     elif excess_kurt < -0.5:
