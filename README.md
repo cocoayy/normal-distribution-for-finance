@@ -1,35 +1,35 @@
-# Normal Distribution for Finance
+# Normal Distribution Visualizer for Finance / 金融向け正規分布可視化ツール
 
-A simple Streamlit-based MVP project for visualizing the normal distribution and understanding its relevance to finance.
+A Streamlit-based MVP project for interactive visualization of the normal distribution.
+Streamlit ベースで正規分布を対話的に可視化する MVP プロジェクトです。
 
-## Overview
+---
 
-This project provides an interactive visualization of the normal distribution.
+## Overview / 概要
 
-Users can:
-- adjust the mean `μ`
-- adjust the standard deviation `σ`
-- specify an interval `[a, b]`
-- view the probability density function (PDF)
-- calculate the probability that a value falls within the selected interval
-- inspect z-scores for the interval bounds
+**English:**
+This project allows users to interactively explore the normal distribution by changing parameters such as mean and standard deviation.
+It also supports PDF/CDF switching, interval probability calculation, and z-score inspection.
 
-This project is intended as a foundational learning tool for:
-- probability and statistics
-- quantitative finance
-- risk management
-- financial engineering
+**日本語:**
+このプロジェクトでは、平均や標準偏差を変更しながら正規分布を対話的に確認できます。
+さらに、PDF/CDF の切り替え、区間確率の計算、z-score の確認にも対応しています。
 
-## Features
+---
 
-- Interactive normal distribution visualization
-- Adjustable `μ` and `σ`
-- Interval probability shading
-- Probability calculation for `[a, b]`
-- z-score display
-- Streamlit UI for quick experimentation
+## Features / 主な機能
 
-## Project Structure
+- Interactive normal distribution visualization / 正規分布の対話的可視化
+- Adjustable mean `μ` / 平均 `μ` の変更
+- Adjustable standard deviation `σ` / 標準偏差 `σ` の変更
+- PDF and CDF switching / PDF と CDF の切り替え
+- Interval probability calculation / 区間確率の計算
+- z-score display / z-score の表示
+- Streamlit UI / Streamlit による UI
+
+---
+
+## Project Structure / ディレクトリ構成
 
 ```plaintext
 normal-distribution-for-finance/
@@ -41,19 +41,6 @@ normal-distribution-for-finance/
 ├── README.md
 ├── requirements.txt
 └── .gitignore
-
-
-## Installation
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-
-
----
-
-# 4. 実行方法
 
 仮想環境を作るならこうです。
 
