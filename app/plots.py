@@ -14,32 +14,9 @@ def create_distribution_figure(
     """
     Create a Plotly figure for PDF or CDF visualization.
     PDF または CDF の可視化用 Plotly グラフを作成する。
-
-    Parameters
-    ----------
-    x : np.ndarray
-        x-axis values / x 軸データ
-    y : np.ndarray
-        y-axis values (PDF or CDF) / PDF または CDF の値
-    mu : float
-        Mean / 平均
-    sigma : float
-        Standard deviation / 標準偏差
-    lower : float
-        Lower bound / 区間下限
-    upper : float
-        Upper bound / 区間上限
-    mode : str
-        "PDF" or "CDF"
-
-    Returns
-    -------
-    go.Figure
-        Plotly Figure object / 描画用 Figure オブジェクト
     """
     fig = go.Figure()
 
-    # Main curve / メイン曲線
     fig.add_trace(
         go.Scatter(
             x=x,
@@ -55,7 +32,6 @@ def create_distribution_figure(
 
     if len(x_fill) > 1:
         if mode == "PDF":
-            # Fill under the PDF curve / PDF の下側を塗りつぶす
             fig.add_trace(
                 go.Scatter(
                     x=np.concatenate(([x_fill[0]], x_fill, [x_fill[-1]])),
@@ -66,7 +42,6 @@ def create_distribution_figure(
                 )
             )
         elif mode == "CDF":
-            # Highlight the CDF segment / CDF の該当区間を強調
             fig.add_trace(
                 go.Scatter(
                     x=x_fill,
@@ -77,7 +52,6 @@ def create_distribution_figure(
                 )
             )
 
-    # Mean line / 平均位置の縦線
     fig.add_vline(
         x=mu,
         line_dash="dash",
@@ -85,7 +59,6 @@ def create_distribution_figure(
         annotation_position="top",
     )
 
-    # Lower and upper bounds / 区間境界
     fig.add_vline(
         x=lower,
         line_dash="dot",
@@ -117,7 +90,6 @@ def create_distribution_figure(
         legend_title="Legend / 凡例",
     )
 
-    # Annotation / 注釈
     fig.add_annotation(
         x=0.98,
         y=0.95,
@@ -127,6 +99,94 @@ def create_distribution_figure(
         showarrow=False,
         align="right",
         borderpad=6,
+    )
+
+    return fig
+
+
+def create_histogram_with_pdf(
+    samples: np.ndarray,
+    x_curve: np.ndarray,
+    y_curve: np.ndarray,
+    title: str,
+    nbins: int = 40,
+) -> go.Figure:
+    """
+    Create a histogram of samples and overlay a theoretical PDF curve.
+    サンプルのヒストグラムに理論 PDF 曲線を重ねる。
+    """
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Histogram(
+            x=samples,
+            nbinsx=nbins,
+            histnorm="probability density",
+            name="Histogram / ヒストグラム",
+            opacity=0.75,
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=x_curve,
+            y=y_curve,
+            mode="lines",
+            name="Normal PDF / 正規分布PDF",
+        )
+    )
+
+    fig.update_layout(
+        title=title,
+        xaxis_title="Value / 値",
+        yaxis_title="Density / 密度",
+        template="plotly_white",
+        barmode="overlay",
+        legend_title="Legend / 凡例",
+    )
+
+    return fig
+
+
+def create_returns_histogram_with_fit(
+    returns: np.ndarray,
+    x_curve: np.ndarray,
+    y_curve: np.ndarray,
+    title: str,
+    nbins: int = 50,
+) -> go.Figure:
+    """
+    Create a histogram for return data and overlay the fitted normal PDF.
+    金融リターンのヒストグラムに当てはめた正規分布を重ねる。
+    """
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Histogram(
+            x=returns,
+            nbinsx=nbins,
+            histnorm="probability density",
+            name="Returns Histogram / リターンヒストグラム",
+            opacity=0.75,
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=x_curve,
+            y=y_curve,
+            mode="lines",
+            name="Fitted Normal PDF / 当てはめ正規分布",
+        )
+    )
+
+    fig.update_layout(
+        title=title,
+        xaxis_title="Daily Return / 日次リターン",
+        yaxis_title="Density / 密度",
+        template="plotly_white",
+        barmode="overlay",
+        legend_title="Legend / 凡例",
     )
 
     return fig

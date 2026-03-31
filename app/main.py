@@ -1,4 +1,5 @@
 import streamlit as st
+import numpy as np
 
 from stats_utils import (
     generate_x_range,
@@ -6,8 +7,17 @@ from stats_utils import (
     normal_cdf,
     interval_probability,
     z_score,
+    generate_samples,
+    fetch_return_series,
+    fit_normal_to_returns,
+    calculate_var_from_returns,
+    calculate_parametric_var,
 )
-from plots import create_distribution_figure
+from plots import (
+    create_distribution_figure,
+    create_histogram_with_pdf,
+    create_returns_histogram_with_fit,
+)
 
 
 # Page configuration / ページ設定
@@ -24,11 +34,11 @@ st.write(
     """
     **English:**
     This Streamlit app helps users interactively understand the normal distribution through parameter changes,
-    interval probability, and PDF/CDF visualization.
+    interval probability, PDF/CDF visualization, random sampling, financial return comparison, and simple VaR analysis.
 
     **日本語:**
-    この Streamlit アプリでは、平均や標準偏差の変更、区間確率、PDF/CDF の可視化を通して、
-    正規分布を対話的に理解できます。
+    この Streamlit アプリでは、平均や標準偏差の変更、区間確率、PDF/CDF の可視化に加えて、
+    サンプル生成、金融リターン比較、簡易 VaR 分析を通して、正規分布を対話的に理解できます。
     """
 )
 
@@ -74,11 +84,10 @@ upper = st.sidebar.number_input(
     step=0.1,
 )
 
-# Swap if lower > upper / lower > upper の場合は入れ替え
 if lower > upper:
     lower, upper = upper, lower
 
-# Generate data / データ生成
+# Main distribution data / メイン分布データ
 x = generate_x_range(mu=mu, sigma=sigma)
 
 if mode == "PDF":
@@ -86,14 +95,10 @@ if mode == "PDF":
 else:
     y = normal_cdf(x=x, mu=mu, sigma=sigma)
 
-# Calculate interval probability / 区間確率を計算
 prob = interval_probability(lower=lower, upper=upper, mu=mu, sigma=sigma)
-
-# z-scores / z-score 計算
 z_lower = z_score(lower, mu, sigma)
 z_upper = z_score(upper, mu, sigma)
 
-# Create figure / グラフ作成
 fig = create_distribution_figure(
     x=x,
     y=y,
@@ -104,7 +109,6 @@ fig = create_distribution_figure(
     mode=mode,
 )
 
-# Layout / レイアウト
 col1, col2 = st.columns([2, 1])
 
 with col1:
@@ -139,6 +143,223 @@ with col2:
 
 st.markdown("---")
 
+# -------------------------------------------------------
+# Random sampling section / サンプル生成セクション
+# -------------------------------------------------------
+st.subheader("Random Sampling and Histogram / サンプル生成とヒストグラム")
+
+st.write(
+    """
+    **English:**
+    This section compares randomly generated samples with the theoretical normal distribution.
+
+    **日本語:**
+    このセクションでは、正規分布から生成した乱数サンプルと理論分布を比較できます。
+    """
+)
+
+sample_col1, sample_col2 = st.columns([1, 2])
+
+with sample_col1:
+    sample_size = st.slider(
+        "Sample Size / サンプル数",
+        min_value=100,
+        max_value=10000,
+        value=1000,
+        step=100,
+    )
+
+    random_seed = st.number_input(
+        "Random Seed / 乱数シード",
+        min_value=0,
+        max_value=999999,
+        value=42,
+        step=1,
+    )
+
+samples = generate_samples(
+    mu=mu,
+    sigma=sigma,
+    sample_size=sample_size,
+    random_seed=int(random_seed),
+)
+
+x_hist = generate_x_range(mu=mu, sigma=sigma)
+y_hist = normal_pdf(x_hist, mu=mu, sigma=sigma)
+
+hist_fig = create_histogram_with_pdf(
+    samples=samples,
+    x_curve=x_hist,
+    y_curve=y_hist,
+    title="Generated Samples vs Theoretical PDF / 生成サンプルと理論PDFの比較",
+)
+
+with sample_col2:
+    st.plotly_chart(hist_fig, use_container_width=True)
+
+sample_mean = float(np.mean(samples))
+sample_std = float(np.std(samples, ddof=1))
+
+metric_col1, metric_col2 = st.columns(2)
+with metric_col1:
+    st.metric(
+        "Sample Mean / 標本平均",
+        f"{sample_mean:.4f}",
+        delta=f"{sample_mean - mu:.4f}",
+    )
+with metric_col2:
+    st.metric(
+        "Sample Std / 標本標準偏差",
+        f"{sample_std:.4f}",
+        delta=f"{sample_std - sigma:.4f}",
+    )
+
+st.markdown("---")
+
+# -------------------------------------------------------
+# Financial return comparison section / 金融リターン比較
+# -------------------------------------------------------
+st.subheader("Financial Return Comparison / 金融リターン比較")
+
+st.write(
+    """
+    **English:**
+    Download real market data, convert it into daily returns, and compare the histogram to a fitted normal distribution.
+
+    **日本語:**
+    実際の市場データを取得して日次リターンに変換し、そのヒストグラムを当てはめた正規分布と比較できます。
+    """
+)
+
+finance_col1, finance_col2 = st.columns([1, 2])
+
+with finance_col1:
+    ticker = st.text_input(
+        "Ticker Symbol / 銘柄コード",
+        value="AAPL",
+        help="Examples: AAPL, MSFT, 7203.T, 6758.T",
+    )
+
+    period = st.selectbox(
+        "Data Period / データ期間",
+        options=["6mo", "1y", "2y", "5y"],
+        index=1,
+    )
+
+    investment_amount = st.number_input(
+        "Investment Amount / 投資額",
+        min_value=1000.0,
+        value=1000000.0,
+        step=1000.0,
+    )
+
+    confidence_level = st.selectbox(
+        "Confidence Level / 信頼水準",
+        options=[0.90, 0.95, 0.99],
+        index=1,
+    )
+
+try:
+    returns = fetch_return_series(ticker=ticker, period=period)
+    return_mu, return_sigma = fit_normal_to_returns(returns)
+
+    x_returns = np.linspace(
+        float(returns.min()),
+        float(returns.max()),
+        1000,
+    )
+    y_returns = normal_pdf(x_returns, return_mu, return_sigma)
+
+    returns_fig = create_returns_histogram_with_fit(
+        returns=returns.to_numpy(),
+        x_curve=x_returns,
+        y_curve=y_returns,
+        title=f"{ticker} Returns vs Fitted Normal / {ticker} のリターンと正規分布比較",
+    )
+
+    with finance_col2:
+        st.plotly_chart(returns_fig, use_container_width=True)
+
+    stats_col1, stats_col2, stats_col3 = st.columns(3)
+    with stats_col1:
+        st.metric("Mean Return / 平均リターン", f"{return_mu:.6f}")
+    with stats_col2:
+        st.metric("Return Std / リターン標準偏差", f"{return_sigma:.6f}")
+    with stats_col3:
+        st.metric("Data Points / データ数", f"{len(returns)}")
+
+    st.write(
+        """
+        **English:**
+        If the histogram and fitted curve differ substantially, it suggests real-world returns may not follow a perfect normal distribution.
+
+        **日本語:**
+        ヒストグラムと当てはめ曲線に大きな差がある場合、実際の金融リターンは完全な正規分布ではない可能性があります。
+        """
+    )
+
+    st.markdown("---")
+
+    # ---------------------------------------------------
+    # VaR section / VaR セクション
+    # ---------------------------------------------------
+    st.subheader("Simple VaR Display / 簡易 VaR 表示")
+
+    st.write(
+        """
+        **English:**
+        VaR (Value at Risk) is a simple risk indicator that estimates potential loss under a given confidence level.
+
+        **日本語:**
+        VaR（Value at Risk）は、ある信頼水準のもとで想定される損失を表す基本的なリスク指標です。
+        """
+    )
+
+    hist_var_return, hist_var_amount = calculate_var_from_returns(
+        returns=returns,
+        confidence_level=confidence_level,
+        investment_amount=investment_amount,
+    )
+
+    param_var_return, param_var_amount = calculate_parametric_var(
+        mu=return_mu,
+        sigma=return_sigma,
+        confidence_level=confidence_level,
+        investment_amount=investment_amount,
+    )
+
+    var_col1, var_col2 = st.columns(2)
+
+    with var_col1:
+        st.markdown("### Historical VaR / ヒストリカル VaR")
+        st.write(f"**VaR Return / VaR リターン:** {hist_var_return:.6f}")
+        st.write(f"**VaR Amount / VaR 金額:** {hist_var_amount:,.2f}")
+
+    with var_col2:
+        st.markdown("### Parametric VaR / パラメトリック VaR")
+        st.write(f"**VaR Return / VaR リターン:** {param_var_return:.6f}")
+        st.write(f"**VaR Amount / VaR 金額:** {param_var_amount:,.2f}")
+
+    st.write(
+        f"""
+        **English:**
+        At the {int(confidence_level * 100)}% confidence level, VaR estimates a one-day loss threshold under historical data
+        or under the normal-distribution assumption.
+
+        **日本語:**
+        信頼水準 {int(confidence_level * 100)}% における VaR は、1日あたりの損失の目安を、
+        過去データベースまたは正規分布仮定ベースで示します。
+        """
+    )
+
+except Exception as e:
+    with finance_col2:
+        st.error(
+            f"Failed to fetch or process financial data / 金融データの取得または処理に失敗しました: {e}"
+        )
+
+st.markdown("---")
+
 st.subheader("What is PDF? / PDF とは")
 st.write(
     """
@@ -146,7 +367,7 @@ st.write(
     PDF (Probability Density Function) describes the relative likelihood of a continuous random variable.
 
     **日本語:**
-    PDF（確率密度関数）は、連続確率変数が各値の近くを取る「相対的な起こりやすさ」を表します。
+    PDF（確率密度関数）は、連続確率変数が各値の近くを取る相対的な起こりやすさを表します。
     """
 )
 
@@ -166,10 +387,10 @@ st.write(
     """
     **English:**
     Normal distributions appear in introductory statistics, quantitative finance, and risk management.
-    They are useful for understanding return distributions, volatility, z-scores, and confidence intervals.
+    They help build intuition for return distributions, volatility, z-scores, confidence intervals, and risk metrics.
 
     **日本語:**
     正規分布は、統計学の基礎だけでなく、クオンツ金融やリスク管理の入り口として重要です。
-    リターン分布、ボラティリティ、z-score、信頼区間などを理解する土台になります。
+    リターン分布、ボラティリティ、z-score、信頼区間、リスク指標の理解に役立ちます。
     """
 )
