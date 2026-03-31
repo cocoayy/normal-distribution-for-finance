@@ -184,21 +184,17 @@ def create_returns_histogram_with_fit(
         )
     )
 
-    # ヒストリカル VaR の位置を縦線で描画
     if hist_var_return is not None:
         fig.add_vline(
             x=hist_var_return,
-            line=dict(color="red", width=2),
             line_dash="dash",
             annotation_text="Historical VaR / ヒストリカルVaR",
             annotation_position="top left",
         )
 
-    # パラメトリック VaR の位置を縦線で描画
     if param_var_return is not None:
         fig.add_vline(
             x=param_var_return,
-            line=dict(color="blue", width=2),
             line_dash="dot",
             annotation_text="Parametric VaR / パラメトリックVaR",
             annotation_position="top right",
