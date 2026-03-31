@@ -153,11 +153,15 @@ def create_returns_histogram_with_fit(
     x_curve: np.ndarray,
     y_curve: np.ndarray,
     title: str,
+    hist_var_return: float | None = None,
+    param_var_return: float | None = None,
     nbins: int = 50,
 ) -> go.Figure:
     """
     Create a histogram for return data and overlay the fitted normal PDF.
-    金融リターンのヒストグラムに当てはめた正規分布を重ねる。
+    Also draw VaR lines when provided.
+    金融リターンのヒストグラムに当てはめた正規分布を重ね、
+    必要に応じて VaR の縦線も表示する。
     """
     fig = go.Figure()
 
@@ -179,6 +183,26 @@ def create_returns_histogram_with_fit(
             name="Fitted Normal PDF / 当てはめ正規分布",
         )
     )
+
+    # ヒストリカル VaR の位置を縦線で描画
+    if hist_var_return is not None:
+        fig.add_vline(
+            x=hist_var_return,
+            line=dict(color="red", width=2),
+            line_dash="dash",
+            annotation_text="Historical VaR / ヒストリカルVaR",
+            annotation_position="top left",
+        )
+
+    # パラメトリック VaR の位置を縦線で描画
+    if param_var_return is not None:
+        fig.add_vline(
+            x=param_var_return,
+            line=dict(color="blue", width=2),
+            line_dash="dot",
+            annotation_text="Parametric VaR / パラメトリックVaR",
+            annotation_position="top right",
+        )
 
     fig.update_layout(
         title=title,
