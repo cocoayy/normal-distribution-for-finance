@@ -12,6 +12,8 @@ from stats_utils import (
     fit_normal_to_returns,
     calculate_var_from_returns,
     calculate_parametric_var,
+    calculate_distribution_shape_metrics,
+    interpret_shape_metrics,
 )
 from plots import (
     create_distribution_figure,
@@ -116,7 +118,6 @@ with col1:
 
 with col2:
     st.subheader("Summary / 概要")
-
     st.write(f"**Mode / モード:** {mode}")
     st.write(f"**Mean (μ) / 平均 (μ):** {mu:.2f}")
     st.write(f"**Standard Deviation (σ) / 標準偏差 (σ):** {sigma:.2f}")
@@ -143,9 +144,9 @@ with col2:
 
 st.markdown("---")
 
-# -------------------------------------------------------
+# =======================================================
 # Random sampling section / サンプル生成セクション
-# -------------------------------------------------------
+# =======================================================
 st.subheader("Random Sampling and Histogram / サンプル生成とヒストグラム")
 
 st.write(
@@ -199,26 +200,31 @@ with sample_col2:
 
 sample_mean = float(np.mean(samples))
 sample_std = float(np.std(samples, ddof=1))
+sample_skew, sample_excess_kurt = calculate_distribution_shape_metrics(samples)
+sample_shape_comment = interpret_shape_metrics(sample_skew, sample_excess_kurt)
 
-metric_col1, metric_col2 = st.columns(2)
-with metric_col1:
-    st.metric(
-        "Sample Mean / 標本平均",
-        f"{sample_mean:.4f}",
-        delta=f"{sample_mean - mu:.4f}",
-    )
-with metric_col2:
-    st.metric(
-        "Sample Std / 標本標準偏差",
-        f"{sample_std:.4f}",
-        delta=f"{sample_std - sigma:.4f}",
-    )
+m1, m2, m3, m4 = st.columns(4)
+with m1:
+    st.metric("Sample Mean / 標本平均", f"{sample_mean:.4f}", delta=f"{sample_mean - mu:.4f}")
+with m2:
+    st.metric("Sample Std / 標本標準偏差", f"{sample_std:.4f}", delta=f"{sample_std - sigma:.4f}")
+with m3:
+    st.metric("Sample Skewness / 標本歪度", f"{sample_skew:.4f}")
+with m4:
+    st.metric("Sample Excess Kurtosis / 標本超過尖度", f"{sample_excess_kurt:.4f}")
+
+st.write(
+    f"""
+    **Sample Shape Comment / 標本分布コメント:**
+    {sample_shape_comment}
+    """
+)
 
 st.markdown("---")
 
-# -------------------------------------------------------
-# Financial return comparison section / 金融リターン比較
-# -------------------------------------------------------
+# =======================================================
+# Financial return comparison / 金融リターン比較
+# =======================================================
 st.subheader("Financial Return Comparison / 金融リターン比較")
 
 st.write(
@@ -263,58 +269,6 @@ try:
     returns = fetch_return_series(ticker=ticker, period=period)
     return_mu, return_sigma = fit_normal_to_returns(returns)
 
-    x_returns = np.linspace(
-        float(returns.min()),
-        float(returns.max()),
-        1000,
-    )
-    y_returns = normal_pdf(x_returns, return_mu, return_sigma)
-
-    returns_fig = create_returns_histogram_with_fit(
-        returns=returns.to_numpy(),
-        x_curve=x_returns,
-        y_curve=y_returns,
-        title=f"{ticker} Returns vs Fitted Normal / {ticker} のリターンと正規分布比較",
-    )
-
-    with finance_col2:
-        st.plotly_chart(returns_fig, use_container_width=True)
-
-    stats_col1, stats_col2, stats_col3 = st.columns(3)
-    with stats_col1:
-        st.metric("Mean Return / 平均リターン", f"{return_mu:.6f}")
-    with stats_col2:
-        st.metric("Return Std / リターン標準偏差", f"{return_sigma:.6f}")
-    with stats_col3:
-        st.metric("Data Points / データ数", f"{len(returns)}")
-
-    st.write(
-        """
-        **English:**
-        If the histogram and fitted curve differ substantially, it suggests real-world returns may not follow a perfect normal distribution.
-
-        **日本語:**
-        ヒストグラムと当てはめ曲線に大きな差がある場合、実際の金融リターンは完全な正規分布ではない可能性があります。
-        """
-    )
-
-    st.markdown("---")
-
-    # ---------------------------------------------------
-    # VaR section / VaR セクション
-    # ---------------------------------------------------
-    st.subheader("Simple VaR Display / 簡易 VaR 表示")
-
-    st.write(
-        """
-        **English:**
-        VaR (Value at Risk) is a simple risk indicator that estimates potential loss under a given confidence level.
-
-        **日本語:**
-        VaR（Value at Risk）は、ある信頼水準のもとで想定される損失を表す基本的なリスク指標です。
-        """
-    )
-
     hist_var_return, hist_var_amount = calculate_var_from_returns(
         returns=returns,
         confidence_level=confidence_level,
@@ -328,7 +282,69 @@ try:
         investment_amount=investment_amount,
     )
 
-    var_col1, var_col2 = st.columns(2)
+    x_returns = np.linspace(float(returns.min()), float(returns.max()), 1000)
+    y_returns = normal_pdf(x_returns, return_mu, return_sigma)
+
+    returns_fig = create_returns_histogram_with_fit(
+        returns=returns.to_numpy(),
+        x_curve=x_returns,
+        y_curve=y_returns,
+        title=f"{ticker} Returns vs Fitted Normal / {ticker} のリターンと正規分布比較",
+        hist_var_return=hist_var_return,
+        param_var_return=param_var_return,
+    )
+
+    with finance_col2:
+        st.plotly_chart(returns_fig, use_container_width=True)
+
+    return_skew, return_excess_kurt = calculate_distribution_shape_metrics(returns)
+    return_shape_comment = interpret_shape_metrics(return_skew, return_excess_kurt)
+
+    r1, r2, r3, r4 = st.columns(4)
+    with r1:
+        st.metric("Mean Return / 平均リターン", f"{return_mu:.6f}")
+    with r2:
+        st.metric("Return Std / リターン標準偏差", f"{return_sigma:.6f}")
+    with r3:
+        st.metric("Skewness / 歪度", f"{return_skew:.4f}")
+    with r4:
+        st.metric("Excess Kurtosis / 超過尖度", f"{return_excess_kurt:.4f}")
+
+    st.write(
+        f"""
+        **Distribution Comment / 分布コメント:**
+        {return_shape_comment}
+        """
+    )
+
+    st.write(
+        """
+        **English:**
+        If the histogram and fitted curve differ substantially, it suggests real-world returns may not follow a perfect normal distribution.
+
+        **日本語:**
+        ヒストグラムと当てはめ曲線に大きな差がある場合、実際の金融リターンは完全な正規分布ではない可能性があります。
+        """
+    )
+
+    st.markdown("---")
+
+    # ===================================================
+    # VaR section / VaR セクション
+    # ===================================================
+    st.subheader("Simple VaR Display / 簡易 VaR 表示")
+
+    st.write(
+        """
+        **English:**
+        VaR (Value at Risk) is a simple risk indicator that estimates potential loss under a given confidence level.
+
+        **日本語:**
+        VaR（Value at Risk）は、ある信頼水準のもとで想定される損失を表す基本的なリスク指標です。
+        """
+    )
+
+    var_col1, var_col2, var_col3 = st.columns(3)
 
     with var_col1:
         st.markdown("### Historical VaR / ヒストリカル VaR")
@@ -340,15 +356,24 @@ try:
         st.write(f"**VaR Return / VaR リターン:** {param_var_return:.6f}")
         st.write(f"**VaR Amount / VaR 金額:** {param_var_amount:,.2f}")
 
+    with var_col3:
+        var_gap = hist_var_amount - param_var_amount
+        st.markdown("### VaR Gap / VaR差分")
+        st.write(f"**Gap Amount / 差分金額:** {var_gap:,.2f}")
+        st.write(
+            "**Meaning / 意味:** "
+            "positive = historical risk is larger / 正なら過去データベースの方が大きい"
+        )
+
     st.write(
         f"""
         **English:**
-        At the {int(confidence_level * 100)}% confidence level, VaR estimates a one-day loss threshold under historical data
-        or under the normal-distribution assumption.
+        At the {int(confidence_level * 100)}% confidence level, the vertical lines on the return histogram show
+        where historical VaR and normal-assumption VaR are located.
 
         **日本語:**
-        信頼水準 {int(confidence_level * 100)}% における VaR は、1日あたりの損失の目安を、
-        過去データベースまたは正規分布仮定ベースで示します。
+        信頼水準 {int(confidence_level * 100)}% において、ヒストグラム上の縦線は
+        ヒストリカル VaR と正規分布仮定の VaR がどこに位置するかを示しています。
         """
     )
 
@@ -382,15 +407,30 @@ st.write(
     """
 )
 
+st.subheader("What are Skewness and Kurtosis? / 歪度と尖度とは")
+st.write(
+    """
+    **English:**
+    Skewness measures asymmetry in a distribution.
+    Excess kurtosis measures tail heaviness relative to a normal distribution.
+
+    **日本語:**
+    歪度は分布の左右非対称性を表します。
+    超過尖度は、正規分布と比べて裾がどれくらい厚いかを表します。
+    """
+)
+
 st.subheader("Why This Matters in Finance / なぜ金融で重要か")
 st.write(
     """
     **English:**
     Normal distributions appear in introductory statistics, quantitative finance, and risk management.
-    They help build intuition for return distributions, volatility, z-scores, confidence intervals, and risk metrics.
+    Comparing theoretical curves, sampled data, real returns, skewness, kurtosis, and VaR helps users understand
+    both the usefulness and the limitations of the normality assumption.
 
     **日本語:**
     正規分布は、統計学の基礎だけでなく、クオンツ金融やリスク管理の入り口として重要です。
-    リターン分布、ボラティリティ、z-score、信頼区間、リスク指標の理解に役立ちます。
+    理論曲線、標本、実データ、歪度、尖度、VaR を比較することで、
+    正規分布仮定の有用性と限界の両方を理解しやすくなります。
     """
 )

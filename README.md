@@ -1,7 +1,7 @@
 # Normal Distribution Visualizer for Finance / 金融向け正規分布可視化ツール
 
-A Streamlit-based MVP project for interactive visualization of the normal distribution, sampling, financial return comparison, and simple VaR analysis.
-Streamlit ベースで、正規分布の可視化、サンプル生成、金融リターン比較、簡易 VaR 分析を行うプロジェクトです。
+A Streamlit-based project for interactive normal distribution visualization, sampling, financial return comparison, skewness/kurtosis inspection, and simple VaR analysis.
+Streamlit ベースで、正規分布の可視化、サンプル生成、金融リターン比較、歪度・尖度の確認、簡易 VaR 分析を行うプロジェクトです。
 
 ---
 
@@ -15,6 +15,7 @@ This project helps users understand the normal distribution interactively throug
 - random sample generation
 - histogram comparison
 - financial return analysis
+- skewness and kurtosis display
 - simple VaR estimation
 
 **日本語:**
@@ -25,6 +26,7 @@ This project helps users understand the normal distribution interactively throug
 - 乱数サンプル生成
 - ヒストグラム比較
 - 金融リターン分析
+- 歪度・尖度の表示
 - 簡易 VaR 推定
 
 ---
@@ -33,30 +35,42 @@ This project helps users understand the normal distribution interactively throug
 
 ### 1. Random Sampling + Histogram / サンプル生成 + ヒストグラム
 **English:**
-This feature connects theory and experiment.
-Instead of only drawing a formula-based curve, the app shows how sampled data approximates the theoretical distribution.
+This connects theory and experiment.
+It shows how generated samples approximate a theoretical normal distribution.
 
 **日本語:**
-この機能は、理論と実験をつなぎます。
-式から描いた理論曲線だけでなく、実際に生成したデータがどのように理論分布に近づくかを確認できます。
+理論と実験をつなぐ機能です。
+生成データが理論分布にどのように近づくかを確認できます。
 
 ### 2. Financial Return Comparison / 金融リターン比較
 **English:**
-This makes the project more finance-oriented.
-Users can compare actual market return distributions with a fitted normal distribution.
+This makes the project clearly finance-oriented.
+It compares actual market return distributions with a fitted normal distribution.
 
 **日本語:**
-この機能によって、プロジェクトが金融寄りになります。
-実際の市場データのリターン分布と、当てはめた正規分布を比較できます。
+プロジェクトを金融寄りにする重要な機能です。
+実際の市場リターン分布と当てはめた正規分布を比較できます。
 
-### 3. Simple VaR Display / 簡易 VaR 表示
+### 3. Skewness and Kurtosis / 歪度・尖度
 **English:**
-This adds a risk-management perspective.
-The app moves from “distribution visualization” toward “basic quantitative finance analysis.”
+These metrics quantify how real data differs from an ideal normal distribution.
 
 **日本語:**
-この機能で、リスク管理の視点が加わります。
-単なる分布の可視化から、基礎的な金融分析ツールへ一歩進みます。
+実データが理想的な正規分布とどの程度異なるかを数値で示せます。
+
+### 4. Simple VaR / 簡易 VaR
+**English:**
+This adds a basic risk-management perspective and connects probability modeling to finance.
+
+**日本語:**
+リスク管理の視点を加え、確率モデルを金融分析につなげます。
+
+### 5. VaR Lines on Histogram / ヒストグラム上の VaR 線
+**English:**
+These lines make risk thresholds visually intuitive.
+
+**日本語:**
+リスクの閾値がどこにあるのかを視覚的に理解しやすくします。
 
 ---
 
@@ -69,8 +83,11 @@ The app moves from “distribution visualization” toward “basic quantitative
 - Interval probability calculation / 区間確率の計算
 - z-score display / z-score の表示
 - Random sampling and histogram overlay / サンプル生成とヒストグラム重ね描き
+- Sample skewness and kurtosis / 標本の歪度・尖度
 - Real financial return comparison / 実データの金融リターン比較
+- Return skewness and kurtosis / リターンの歪度・尖度
 - Historical and parametric VaR / ヒストリカル VaR とパラメトリック VaR
+- VaR vertical lines on histogram / ヒストグラム上の VaR 縦線
 - Streamlit UI / Streamlit による UI
 
 ---
@@ -88,7 +105,10 @@ normal-distribution-for-finance/
 ├── requirements.txt
 └── .gitignore
 
-仮想環境を作るならこうです。
+
+---
+
+## 仮想環境を作るならこうです。
 
 ## Mac / Linux
 
