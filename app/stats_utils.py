@@ -71,6 +71,9 @@ def fetch_return_series(ticker: str, period: str = "1y") -> pd.Series:
     if returns.empty:
         raise ValueError("リターン系列が空です。")
 
+    # index 名を持たせておくと、可視化時に扱いやすい
+    returns.name = "daily_return"
+
     return returns
 
 
@@ -146,18 +149,38 @@ def interpret_shape_metrics(skewness: float, excess_kurt: float) -> str:
 def calculate_qq_plot_data(data: np.ndarray | pd.Series) -> tuple[np.ndarray, np.ndarray, float, float]:
     """
     QQプロット用データを生成する。
-
-    Returns
-    -------
-    theoretical_quantiles : np.ndarray
-        理論正規分布の分位点
-    ordered_values : np.ndarray
-        実データの並べ替え済み値
-    slope : float
-        参照直線の傾き
-    intercept : float
-        参照直線の切片
     """
     array = np.asarray(data, dtype=float)
     (theoretical_quantiles, ordered_values), (slope, intercept, _) = probplot(array, dist="norm")
     return theoretical_quantiles, ordered_values, float(slope), float(intercept)
+
+
+def calculate_rolling_volatility(
+    returns: pd.Series,
+    window: int,
+    annualization_factor: int = 252,
+) -> pd.Series:
+    """
+    ローリングボラティリティを計算する。
+
+    Parameters
+    ----------
+    returns : pd.Series
+        日次リターン系列
+    window : int
+        何営業日の窓で標準偏差を計算するか
+    annualization_factor : int
+        年率換算係数。日次データなら通常 252 を使う
+
+    Returns
+    -------
+    pd.Series
+        年率換算済みローリングボラティリティ
+    """
+    if window < 2:
+        raise ValueError("window は 2 以上にしてください。")
+
+    rolling_std = returns.rolling(window=window).std(ddof=1)
+    rolling_vol = rolling_std * np.sqrt(annualization_factor)
+    rolling_vol.name = "rolling_volatility"
+    return rolling_vol.dropna()

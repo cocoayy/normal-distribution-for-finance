@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
 
 
@@ -180,7 +181,6 @@ def create_returns_histogram_with_fit(
         )
     )
 
-    # ヒストリカル VaR より左側の理論分布を塗る
     if hist_var_return is not None:
         mask_hist = x_curve <= hist_var_return
         x_hist_tail = x_curve[mask_hist]
@@ -204,7 +204,6 @@ def create_returns_histogram_with_fit(
             annotation_position="top left",
         )
 
-    # パラメトリック VaR の縦線
     if param_var_return is not None:
         fig.add_vline(
             x=param_var_return,
@@ -262,6 +261,35 @@ def create_qq_plot(
         title=title,
         xaxis_title="理論分位点",
         yaxis_title="実データ分位点",
+        template="plotly_white",
+        legend_title="凡例",
+    )
+
+    return fig
+
+
+def create_rolling_volatility_plot(
+    rolling_vol: pd.Series,
+    title: str,
+) -> go.Figure:
+    """
+    ローリングボラティリティの時系列グラフを作成する。
+    """
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Scatter(
+            x=rolling_vol.index,
+            y=rolling_vol.values,
+            mode="lines",
+            name="ローリングボラティリティ",
+        )
+    )
+
+    fig.update_layout(
+        title=title,
+        xaxis_title="日付",
+        yaxis_title="年率換算ボラティリティ",
         template="plotly_white",
         legend_title="凡例",
     )
