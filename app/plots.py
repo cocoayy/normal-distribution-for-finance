@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
 
 
@@ -12,8 +13,7 @@ def create_distribution_figure(
     mode: str,
 ) -> go.Figure:
     """
-    Create a Plotly figure for PDF or CDF visualization.
-    PDF または CDF の可視化用 Plotly グラフを作成する。
+    PDF または CDF の可視化用グラフを作成する。
     """
     fig = go.Figure()
 
@@ -38,7 +38,7 @@ def create_distribution_figure(
                     y=np.concatenate(([0], y_fill, [0])),
                     fill="toself",
                     mode="lines",
-                    name="Selected Interval / 指定区間",
+                    name="指定区間",
                 )
             )
         elif mode == "CDF":
@@ -47,7 +47,7 @@ def create_distribution_figure(
                     x=x_fill,
                     y=y_fill,
                     mode="lines",
-                    name="Selected Interval / 指定区間",
+                    name="指定区間",
                     line=dict(width=4),
                 )
             )
@@ -62,32 +62,32 @@ def create_distribution_figure(
     fig.add_vline(
         x=lower,
         line_dash="dot",
-        annotation_text=f"lower = {lower:.2f}",
+        annotation_text=f"下限 = {lower:.2f}",
         annotation_position="bottom left",
     )
     fig.add_vline(
         x=upper,
         line_dash="dot",
-        annotation_text=f"upper = {upper:.2f}",
+        annotation_text=f"上限 = {upper:.2f}",
         annotation_position="bottom right",
     )
 
     title_map = {
-        "PDF": "Normal Distribution PDF / 正規分布の確率密度関数",
-        "CDF": "Normal Distribution CDF / 正規分布の累積分布関数",
+        "PDF": "正規分布の確率密度関数（PDF）",
+        "CDF": "正規分布の累積分布関数（CDF）",
     }
 
     yaxis_map = {
-        "PDF": "Density / 確率密度",
-        "CDF": "Cumulative Probability / 累積確率",
+        "PDF": "確率密度",
+        "CDF": "累積確率",
     }
 
     fig.update_layout(
-        title=title_map.get(mode, "Distribution / 分布"),
+        title=title_map.get(mode, "分布"),
         xaxis_title="x",
-        yaxis_title=yaxis_map.get(mode, "Value / 値"),
+        yaxis_title=yaxis_map.get(mode, "値"),
         template="plotly_white",
-        legend_title="Legend / 凡例",
+        legend_title="凡例",
     )
 
     fig.add_annotation(
@@ -95,7 +95,7 @@ def create_distribution_figure(
         y=0.95,
         xref="paper",
         yref="paper",
-        text=f"μ = {mu:.2f}<br>σ = {sigma:.2f}<br>Mode = {mode}",
+        text=f"μ = {mu:.2f}<br>σ = {sigma:.2f}<br>モード = {mode}",
         showarrow=False,
         align="right",
         borderpad=6,
@@ -112,8 +112,7 @@ def create_histogram_with_pdf(
     nbins: int = 40,
 ) -> go.Figure:
     """
-    Create a histogram of samples and overlay a theoretical PDF curve.
-    サンプルのヒストグラムに理論 PDF 曲線を重ねる。
+    サンプルのヒストグラムに理論 PDF を重ねる。
     """
     fig = go.Figure()
 
@@ -122,7 +121,7 @@ def create_histogram_with_pdf(
             x=samples,
             nbinsx=nbins,
             histnorm="probability density",
-            name="Histogram / ヒストグラム",
+            name="ヒストグラム",
             opacity=0.75,
         )
     )
@@ -132,17 +131,17 @@ def create_histogram_with_pdf(
             x=x_curve,
             y=y_curve,
             mode="lines",
-            name="Normal PDF / 正規分布PDF",
+            name="正規分布PDF",
         )
     )
 
     fig.update_layout(
         title=title,
-        xaxis_title="Value / 値",
-        yaxis_title="Density / 密度",
+        xaxis_title="値",
+        yaxis_title="密度",
         template="plotly_white",
         barmode="overlay",
-        legend_title="Legend / 凡例",
+        legend_title="凡例",
     )
 
     return fig
@@ -158,10 +157,8 @@ def create_returns_histogram_with_fit(
     nbins: int = 50,
 ) -> go.Figure:
     """
-    Create a histogram for return data and overlay the fitted normal PDF.
-    Also draw VaR lines when provided.
-    金融リターンのヒストグラムに当てはめた正規分布を重ね、
-    必要に応じて VaR の縦線も表示する。
+    リターンのヒストグラムに当てはめた正規分布を重ね、
+    VaR の縦線と左尾の塗りつぶしを表示する。
     """
     fig = go.Figure()
 
@@ -170,7 +167,7 @@ def create_returns_histogram_with_fit(
             x=returns,
             nbinsx=nbins,
             histnorm="probability density",
-            name="Returns Histogram / リターンヒストグラム",
+            name="リターンヒストグラム",
             opacity=0.75,
         )
     )
@@ -180,15 +177,30 @@ def create_returns_histogram_with_fit(
             x=x_curve,
             y=y_curve,
             mode="lines",
-            name="Fitted Normal PDF / 当てはめ正規分布",
+            name="当てはめ正規分布",
         )
     )
 
     if hist_var_return is not None:
+        mask_hist = x_curve <= hist_var_return
+        x_hist_tail = x_curve[mask_hist]
+        y_hist_tail = y_curve[mask_hist]
+
+        if len(x_hist_tail) > 1:
+            fig.add_trace(
+                go.Scatter(
+                    x=np.concatenate(([x_hist_tail[0]], x_hist_tail, [x_hist_tail[-1]])),
+                    y=np.concatenate(([0], y_hist_tail, [0])),
+                    fill="toself",
+                    mode="lines",
+                    name="ヒストリカルVaR左尾",
+                )
+            )
+
         fig.add_vline(
             x=hist_var_return,
             line_dash="dash",
-            annotation_text="Historical VaR / ヒストリカルVaR",
+            annotation_text="ヒストリカルVaR",
             annotation_position="top left",
         )
 
@@ -196,17 +208,90 @@ def create_returns_histogram_with_fit(
         fig.add_vline(
             x=param_var_return,
             line_dash="dot",
-            annotation_text="Parametric VaR / パラメトリックVaR",
+            annotation_text="パラメトリックVaR",
             annotation_position="top right",
         )
 
     fig.update_layout(
         title=title,
-        xaxis_title="Daily Return / 日次リターン",
-        yaxis_title="Density / 密度",
+        xaxis_title="日次リターン",
+        yaxis_title="密度",
         template="plotly_white",
         barmode="overlay",
-        legend_title="Legend / 凡例",
+        legend_title="凡例",
+    )
+
+    return fig
+
+
+def create_qq_plot(
+    theoretical_quantiles: np.ndarray,
+    ordered_values: np.ndarray,
+    slope: float,
+    intercept: float,
+    title: str,
+) -> go.Figure:
+    """
+    QQプロットを作成する。
+    """
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Scatter(
+            x=theoretical_quantiles,
+            y=ordered_values,
+            mode="markers",
+            name="実データ",
+        )
+    )
+
+    line_x = np.array([theoretical_quantiles.min(), theoretical_quantiles.max()])
+    line_y = slope * line_x + intercept
+
+    fig.add_trace(
+        go.Scatter(
+            x=line_x,
+            y=line_y,
+            mode="lines",
+            name="基準直線",
+        )
+    )
+
+    fig.update_layout(
+        title=title,
+        xaxis_title="理論分位点",
+        yaxis_title="実データ分位点",
+        template="plotly_white",
+        legend_title="凡例",
+    )
+
+    return fig
+
+
+def create_rolling_volatility_plot(
+    rolling_vol: pd.Series,
+    title: str,
+) -> go.Figure:
+    """
+    ローリングボラティリティの時系列グラフを作成する。
+    """
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Scatter(
+            x=rolling_vol.index,
+            y=rolling_vol.values,
+            mode="lines",
+            name="ローリングボラティリティ",
+        )
+    )
+
+    fig.update_layout(
+        title=title,
+        xaxis_title="日付",
+        yaxis_title="年率換算ボラティリティ",
+        template="plotly_white",
+        legend_title="凡例",
     )
 
     return fig
