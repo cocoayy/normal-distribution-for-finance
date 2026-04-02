@@ -173,14 +173,39 @@ def calculate_rolling_volatility(
 def parse_ticker_list(ticker_text: str) -> list[str]:
     """
     カンマ区切りの文字列から銘柄コードリストを生成する。
-
-    例:
-    'AAPL, MSFT, 7203.T'
-    -> ['AAPL', 'MSFT', '7203.T']
     """
     tickers = [ticker.strip() for ticker in ticker_text.split(",")]
     tickers = [ticker for ticker in tickers if ticker]
     return list(dict.fromkeys(tickers))
+
+
+def fetch_multi_return_df(
+    tickers: list[str],
+    period: str,
+) -> pd.DataFrame:
+    """
+    複数銘柄の日次リターンを横持ち DataFrame で返す。
+    """
+    return_list = []
+
+    for ticker in tickers:
+        returns = fetch_return_series(ticker=ticker, period=period)
+        return_list.append(returns.rename(ticker))
+
+    returns_df = pd.concat(return_list, axis=1).dropna()
+
+    if returns_df.empty:
+        raise ValueError("複数銘柄の共通期間リターンが取得できませんでした。")
+
+    return returns_df
+
+
+def calculate_correlation_matrix(returns_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    日次リターンの相関行列を計算する。
+    """
+    corr_df = returns_df.corr()
+    return corr_df
 
 
 def build_multi_ticker_summary(
@@ -192,13 +217,6 @@ def build_multi_ticker_summary(
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     複数銘柄の比較用サマリー表とローリングボラティリティ表を作成する。
-
-    Returns
-    -------
-    summary_df : pd.DataFrame
-        各銘柄の統計量・VaR をまとめた表
-    rolling_vol_df : pd.DataFrame
-        各銘柄のローリングボラティリティを横持ちでまとめた表
     """
     summary_rows = []
     rolling_vol_list = []
