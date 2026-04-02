@@ -302,7 +302,7 @@ def create_multi_rolling_volatility_plot(
     title: str,
 ) -> go.Figure:
     """
-    複数銘柄のローリングボラティリティを比較する時系列グラフを作成する。
+    複数銘柄のローリングボラティリティ比較グラフを作成する。
     """
     fig = go.Figure()
 
@@ -322,6 +322,37 @@ def create_multi_rolling_volatility_plot(
         yaxis_title="年率換算ボラティリティ",
         template="plotly_white",
         legend_title="銘柄",
+    )
+
+    return fig
+
+
+def create_correlation_heatmap(
+    corr_df: pd.DataFrame,
+    title: str,
+) -> go.Figure:
+    """
+    相関行列のヒートマップを作成する。
+    """
+    fig = go.Figure(
+        data=go.Heatmap(
+            z=corr_df.values,
+            x=corr_df.columns,
+            y=corr_df.index,
+            zmin=-1,
+            zmax=1,
+            text=np.round(corr_df.values, 3),
+            texttemplate="%{text}",
+            textfont={"size": 12},
+            colorbar={"title": "相関係数"},
+        )
+    )
+
+    fig.update_layout(
+        title=title,
+        xaxis_title="銘柄",
+        yaxis_title="銘柄",
+        template="plotly_white",
     )
 
     return fig

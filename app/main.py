@@ -18,6 +18,8 @@ from stats_utils import (
     calculate_rolling_volatility,
     parse_ticker_list,
     build_multi_ticker_summary,
+    fetch_multi_return_df,
+    calculate_correlation_matrix,
 )
 from plots import (
     create_distribution_figure,
@@ -26,6 +28,7 @@ from plots import (
     create_qq_plot,
     create_rolling_volatility_plot,
     create_multi_rolling_volatility_plot,
+    create_correlation_heatmap,
 )
 from notes import render_notes_tab
 
@@ -43,7 +46,7 @@ st.write(
     """
     このアプリでは、平均や標準偏差の変更、区間確率、PDF/CDF の可視化に加えて、
     サンプル生成、金融リターン比較、歪度・尖度、QQプロット、ローリングボラティリティ、
-    複数銘柄比較、簡易 VaR 分析を通して、正規分布と金融リスクを対話的に理解できます。
+    複数銘柄比較、相関行列、簡易 VaR 分析を通して、正規分布と金融リスクを対話的に理解できます。
     """
 )
 
@@ -220,8 +223,6 @@ with tab_sampling_finance:
         st.write(f"**分布コメント:** {return_shape_comment}")
 
         st.markdown("### QQプロット")
-        st.write("実データが正規分布に近いかどうかを確認します。")
-
         qq_x, qq_y, qq_slope, qq_intercept = calculate_qq_plot_data(returns)
         qq_fig = create_qq_plot(
             theoretical_quantiles=qq_x,
@@ -233,8 +234,6 @@ with tab_sampling_finance:
         st.plotly_chart(qq_fig, use_container_width=True)
 
         st.markdown("### ローリングボラティリティ")
-        st.write("時間とともにボラティリティがどう変化したかを確認します。")
-
         rolling_vol = calculate_rolling_volatility(
             returns=returns,
             window=rolling_window,
@@ -336,6 +335,12 @@ with tab_sampling_finance:
                 rolling_window=multi_rolling_window,
             )
 
+            returns_df = fetch_multi_return_df(
+                tickers=multi_tickers,
+                period=multi_period,
+            )
+            corr_df = calculate_correlation_matrix(returns_df)
+
             with multi_col2:
                 multi_roll_fig = create_multi_rolling_volatility_plot(
                     rolling_vol_df=rolling_vol_df,
@@ -346,6 +351,14 @@ with tab_sampling_finance:
             st.markdown("### 比較サマリー表")
             st.dataframe(summary_df, use_container_width=True)
 
+            st.markdown("### 相関行列")
+            corr_fig = create_correlation_heatmap(
+                corr_df=corr_df,
+                title="複数銘柄の日次リターン相関行列",
+            )
+            st.plotly_chart(corr_fig, use_container_width=True)
+            st.dataframe(corr_df, use_container_width=True)
+
             st.markdown("### 見方")
             st.write(
                 """
@@ -353,6 +366,7 @@ with tab_sampling_finance:
                 - **標準偏差** や **直近ローリングボラティリティ** が大きいほど、変動性が高いです。
                 - **超過尖度** が大きいほど、極端な値が出やすい傾向があります。
                 - **VaR 金額** が大きいほど、損失見積もりが大きいことを意味します。
+                - **相関係数** が高いほど、銘柄同士が似た動きをしやすいです。
                 """
             )
 
