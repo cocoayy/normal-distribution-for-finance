@@ -71,9 +71,7 @@ def fetch_return_series(ticker: str, period: str = "1y") -> pd.Series:
     if returns.empty:
         raise ValueError("リターン系列が空です。")
 
-    # index 名を持たせておくと、可視化時に扱いやすい
-    returns.name = "daily_return"
-
+    returns.name = ticker
     return returns
 
 
@@ -162,25 +160,85 @@ def calculate_rolling_volatility(
 ) -> pd.Series:
     """
     ローリングボラティリティを計算する。
-
-    Parameters
-    ----------
-    returns : pd.Series
-        日次リターン系列
-    window : int
-        何営業日の窓で標準偏差を計算するか
-    annualization_factor : int
-        年率換算係数。日次データなら通常 252 を使う
-
-    Returns
-    -------
-    pd.Series
-        年率換算済みローリングボラティリティ
     """
     if window < 2:
         raise ValueError("window は 2 以上にしてください。")
 
     rolling_std = returns.rolling(window=window).std(ddof=1)
     rolling_vol = rolling_std * np.sqrt(annualization_factor)
-    rolling_vol.name = "rolling_volatility"
+    rolling_vol.name = f"{returns.name}_rolling_volatility" if returns.name else "rolling_volatility"
     return rolling_vol.dropna()
+
+
+def parse_ticker_list(ticker_text: str) -> list[str]:
+    """
+    カンマ区切りの文字列から銘柄コードリストを生成する。
+
+    例:
+    'AAPL, MSFT, 7203.T'
+    -> ['AAPL', 'MSFT', '7203.T']
+    """
+    tickers = [ticker.strip() for ticker in ticker_text.split(",")]
+    tickers = [ticker for ticker in tickers if ticker]
+    return list(dict.fromkeys(tickers))
+
+
+def build_multi_ticker_summary(
+    tickers: list[str],
+    period: str,
+    confidence_level: float,
+    investment_amount: float,
+    rolling_window: int,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    複数銘柄の比較用サマリー表とローリングボラティリティ表を作成する。
+
+    Returns
+    -------
+    summary_df : pd.DataFrame
+        各銘柄の統計量・VaR をまとめた表
+    rolling_vol_df : pd.DataFrame
+        各銘柄のローリングボラティリティを横持ちでまとめた表
+    """
+    summary_rows = []
+    rolling_vol_list = []
+
+    for ticker in tickers:
+        returns = fetch_return_series(ticker=ticker, period=period)
+        mu, sigma = fit_normal_to_returns(returns)
+        skewness, excess_kurt = calculate_distribution_shape_metrics(returns)
+        hist_var_return, hist_var_amount = calculate_var_from_returns(
+            returns=returns,
+            confidence_level=confidence_level,
+            investment_amount=investment_amount,
+        )
+        param_var_return, param_var_amount = calculate_parametric_var(
+            mu=mu,
+            sigma=sigma,
+            confidence_level=confidence_level,
+            investment_amount=investment_amount,
+        )
+        rolling_vol = calculate_rolling_volatility(returns=returns, window=rolling_window)
+        latest_rolling_vol = float(rolling_vol.iloc[-1])
+
+        summary_rows.append(
+            {
+                "銘柄": ticker,
+                "平均リターン": mu,
+                "標準偏差": sigma,
+                "歪度": skewness,
+                "超過尖度": excess_kurt,
+                "ヒストリカルVaR(リターン)": hist_var_return,
+                "ヒストリカルVaR(金額)": hist_var_amount,
+                "パラメトリックVaR(リターン)": param_var_return,
+                "パラメトリックVaR(金額)": param_var_amount,
+                "直近ローリングボラティリティ": latest_rolling_vol,
+            }
+        )
+
+        rolling_vol_list.append(rolling_vol.rename(ticker))
+
+    summary_df = pd.DataFrame(summary_rows)
+    rolling_vol_df = pd.concat(rolling_vol_list, axis=1)
+
+    return summary_df, rolling_vol_df

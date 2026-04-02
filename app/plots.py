@@ -295,3 +295,33 @@ def create_rolling_volatility_plot(
     )
 
     return fig
+
+
+def create_multi_rolling_volatility_plot(
+    rolling_vol_df: pd.DataFrame,
+    title: str,
+) -> go.Figure:
+    """
+    複数銘柄のローリングボラティリティを比較する時系列グラフを作成する。
+    """
+    fig = go.Figure()
+
+    for column in rolling_vol_df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=rolling_vol_df.index,
+                y=rolling_vol_df[column],
+                mode="lines",
+                name=column,
+            )
+        )
+
+    fig.update_layout(
+        title=title,
+        xaxis_title="日付",
+        yaxis_title="年率換算ボラティリティ",
+        template="plotly_white",
+        legend_title="銘柄",
+    )
+
+    return fig

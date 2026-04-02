@@ -16,6 +16,8 @@ from stats_utils import (
     interpret_shape_metrics,
     calculate_qq_plot_data,
     calculate_rolling_volatility,
+    parse_ticker_list,
+    build_multi_ticker_summary,
 )
 from plots import (
     create_distribution_figure,
@@ -23,6 +25,7 @@ from plots import (
     create_returns_histogram_with_fit,
     create_qq_plot,
     create_rolling_volatility_plot,
+    create_multi_rolling_volatility_plot,
 )
 from notes import render_notes_tab
 
@@ -39,8 +42,8 @@ st.title("📈 金融向け正規分布可視化ツール")
 st.write(
     """
     このアプリでは、平均や標準偏差の変更、区間確率、PDF/CDF の可視化に加えて、
-    サンプル生成、金融リターン比較、歪度・尖度、QQプロット、ローリングボラティリティ、簡易 VaR 分析を通して、
-    正規分布と金融リスクを対話的に理解できます。
+    サンプル生成、金融リターン比較、歪度・尖度、QQプロット、ローリングボラティリティ、
+    複数銘柄比較、簡易 VaR 分析を通して、正規分布と金融リスクを対話的に理解できます。
     """
 )
 
@@ -157,7 +160,7 @@ with tab_sampling_finance:
 
     st.markdown("---")
 
-    st.markdown("## 金融リターン比較")
+    st.markdown("## 単一銘柄の金融リターン比較")
     st.write("実際の市場データを取得して日次リターンに変換し、そのヒストグラムを正規分布と比較します。")
 
     finance_col1, finance_col2 = st.columns([1, 2])
@@ -277,6 +280,85 @@ with tab_sampling_finance:
     except Exception as e:
         with finance_col2:
             st.error(f"金融データの取得または処理に失敗しました: {e}")
+
+    st.markdown("---")
+
+    st.markdown("## 複数銘柄比較")
+    st.write("複数の銘柄を同じ指標で横並び比較できます。")
+
+    multi_col1, multi_col2 = st.columns([1, 2])
+
+    with multi_col1:
+        multi_ticker_text = st.text_input(
+            "比較する銘柄コード（カンマ区切り）",
+            value="AAPL, MSFT, GOOGL",
+            help="例: AAPL, MSFT, GOOGL または 7203.T, 6758.T, 9984.T",
+        )
+        multi_period = st.selectbox(
+            "比較用データ期間",
+            options=["6mo", "1y", "2y", "5y"],
+            index=1,
+            key="multi_period",
+        )
+        multi_confidence_level = st.selectbox(
+            "比較用信頼水準",
+            options=[0.90, 0.95, 0.99],
+            index=1,
+            key="multi_confidence_level",
+        )
+        multi_investment_amount = st.number_input(
+            "比較用投資額",
+            min_value=1000.0,
+            value=1000000.0,
+            step=1000.0,
+            key="multi_investment_amount",
+        )
+        multi_rolling_window = st.slider(
+            "比較用ローリング窓幅（日数）",
+            min_value=5,
+            max_value=120,
+            value=20,
+            step=1,
+            key="multi_rolling_window",
+        )
+
+    try:
+        multi_tickers = parse_ticker_list(multi_ticker_text)
+
+        if len(multi_tickers) < 2:
+            st.warning("複数銘柄比較を行うには、2つ以上の銘柄コードを入力してください。")
+        else:
+            summary_df, rolling_vol_df = build_multi_ticker_summary(
+                tickers=multi_tickers,
+                period=multi_period,
+                confidence_level=multi_confidence_level,
+                investment_amount=multi_investment_amount,
+                rolling_window=multi_rolling_window,
+            )
+
+            with multi_col2:
+                multi_roll_fig = create_multi_rolling_volatility_plot(
+                    rolling_vol_df=rolling_vol_df,
+                    title=f"複数銘柄のローリングボラティリティ比較（{multi_rolling_window}日）",
+                )
+                st.plotly_chart(multi_roll_fig, use_container_width=True)
+
+            st.markdown("### 比較サマリー表")
+            st.dataframe(summary_df, use_container_width=True)
+
+            st.markdown("### 見方")
+            st.write(
+                """
+                - **平均リターン** が高いほど、その期間の平均的な収益率は高いです。
+                - **標準偏差** や **直近ローリングボラティリティ** が大きいほど、変動性が高いです。
+                - **超過尖度** が大きいほど、極端な値が出やすい傾向があります。
+                - **VaR 金額** が大きいほど、損失見積もりが大きいことを意味します。
+                """
+            )
+
+    except Exception as e:
+        with multi_col2:
+            st.error(f"複数銘柄比較の処理に失敗しました: {e}")
 
 with tab_notes:
     render_notes_tab()
