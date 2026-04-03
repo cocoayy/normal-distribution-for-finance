@@ -173,9 +173,6 @@ def calculate_rolling_volatility(
 def calculate_cumulative_returns(returns: pd.Series) -> pd.Series:
     """
     累積リターンを計算する。
-
-    定義:
-        cumulative_t = (1 + r_1)(1 + r_2)...(1 + r_t) - 1
     """
     cumulative = (1.0 + returns).cumprod() - 1.0
     cumulative.name = f"{returns.name}_cumulative_return" if returns.name else "cumulative_return"
@@ -185,11 +182,6 @@ def calculate_cumulative_returns(returns: pd.Series) -> pd.Series:
 def calculate_drawdown(cumulative_returns: pd.Series) -> pd.Series:
     """
     累積リターン系列からドローダウン系列を計算する。
-
-    Notes
-    -----
-    wealth_index = 1 + cumulative_returns
-    drawdown = wealth / wealth の過去最大値 - 1
     """
     wealth_index = 1.0 + cumulative_returns
     running_max = wealth_index.cummax()
@@ -312,3 +304,94 @@ def build_multi_ticker_summary(
     rolling_vol_df = pd.concat(rolling_vol_list, axis=1)
 
     return summary_df, rolling_vol_df
+
+
+# =========================================================
+# シミュレーション用
+# =========================================================
+def generate_population_samples(
+    distribution_name: str,
+    size: int,
+    random_seed: int,
+) -> np.ndarray:
+    """
+    中心極限定理シミュレーション用の母集団サンプルを生成する。
+    """
+    rng = np.random.default_rng(random_seed)
+
+    if distribution_name == "一様分布":
+        return rng.uniform(0.0, 1.0, size=size)
+
+    if distribution_name == "指数分布":
+        return rng.exponential(scale=1.0, size=size)
+
+    if distribution_name == "ベルヌーイ分布":
+        return rng.binomial(n=1, p=0.3, size=size)
+
+    raise ValueError("未対応の分布です。")
+
+
+def simulate_sample_means(
+    distribution_name: str,
+    sample_size: int,
+    num_trials: int,
+    random_seed: int,
+) -> np.ndarray:
+    """
+    中心極限定理のために、標本平均を多数生成する。
+    """
+    rng = np.random.default_rng(random_seed)
+
+    if distribution_name == "一様分布":
+        samples = rng.uniform(0.0, 1.0, size=(num_trials, sample_size))
+    elif distribution_name == "指数分布":
+        samples = rng.exponential(scale=1.0, size=(num_trials, sample_size))
+    elif distribution_name == "ベルヌーイ分布":
+        samples = rng.binomial(n=1, p=0.3, size=(num_trials, sample_size))
+    else:
+        raise ValueError("未対応の分布です。")
+
+    return samples.mean(axis=1)
+
+
+def monte_carlo_pi(
+    num_points: int,
+    random_seed: int,
+) -> tuple[float, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    モンテカルロ法で円周率 π を推定する。
+
+    Returns
+    -------
+    pi_estimate : float
+        推定された π
+    x : np.ndarray
+        サンプリング点 x 座標
+    y : np.ndarray
+        サンプリング点 y 座標
+    inside_mask : np.ndarray
+        単位円内かどうかの真偽値
+    """
+    rng = np.random.default_rng(random_seed)
+    x = rng.uniform(-1.0, 1.0, size=num_points)
+    y = rng.uniform(-1.0, 1.0, size=num_points)
+    inside_mask = x**2 + y**2 <= 1.0
+    pi_estimate = 4.0 * inside_mask.mean()
+    return float(pi_estimate), x, y, inside_mask
+
+
+def monte_carlo_normal_interval_probability(
+    mu: float,
+    sigma: float,
+    lower: float,
+    upper: float,
+    num_samples: int,
+    random_seed: int,
+) -> float:
+    """
+    正規分布の区間確率をモンテカルロ法で近似する。
+    """
+    rng = np.random.default_rng(random_seed)
+    samples = rng.normal(loc=mu, scale=sigma, size=num_samples)
+    estimate = ((samples >= lower) & (samples <= upper)).mean()
+    return float(estimate)

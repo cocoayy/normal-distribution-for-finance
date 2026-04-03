@@ -23,6 +23,10 @@ from stats_utils import (
     fetch_multi_return_df,
     calculate_correlation_matrix,
     calculate_multi_cumulative_returns,
+    generate_population_samples,
+    simulate_sample_means,
+    monte_carlo_pi,
+    monte_carlo_normal_interval_probability,
 )
 from plots import (
     create_distribution_figure,
@@ -34,11 +38,12 @@ from plots import (
     create_correlation_heatmap,
     create_cumulative_return_plot,
     create_multi_cumulative_return_plot,
+    create_clt_histogram,
+    create_monte_carlo_pi_scatter,
 )
 from notes import render_notes_tab
 
 
-# ページ設定
 st.set_page_config(
     page_title="金融向け正規分布可視化ツール",
     page_icon="📈",
@@ -51,21 +56,25 @@ st.write(
     """
     このアプリでは、平均や標準偏差の変更、区間確率、PDF/CDF の可視化に加えて、
     サンプル生成、金融リターン比較、歪度・尖度、QQプロット、ローリングボラティリティ、
-    複数銘柄比較、相関行列、累積リターン比較、簡易 VaR 分析を通して、
-    正規分布と金融リスクを対話的に理解できます。
+    複数銘柄比較、相関行列、累積リターン比較、中心極限定理シミュレーション、
+    モンテカルロ法を通して、確率・統計・金融リスクを対話的に理解できます。
     """
 )
 
 st.markdown("---")
 
-tab_visualizer, tab_sampling_finance, tab_notes = st.tabs(
+tab_visualizer, tab_finance, tab_simulation, tab_notes = st.tabs(
     [
         "可視化",
         "サンプルと金融",
+        "シミュレーション",
         "解説ノート",
     ]
 )
 
+# =======================================================
+# 可視化
+# =======================================================
 with tab_visualizer:
     st.subheader("分布可視化")
     st.write("パラメータを変更しながら、正規分布と区間確率を確認できます。")
@@ -103,7 +112,7 @@ with tab_visualizer:
     )
 
     with control_col2:
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True, key="distribution_visualizer_chart")
 
     summary_col1, summary_col2, summary_col3 = st.columns(3)
     with summary_col1:
@@ -116,7 +125,10 @@ with tab_visualizer:
         st.metric("表示モード", mode)
         st.metric("上限 zスコア", f"{z_upper:.4f}")
 
-with tab_sampling_finance:
+# =======================================================
+# サンプルと金融
+# =======================================================
+with tab_finance:
     st.subheader("サンプル生成と金融分析")
 
     st.markdown("## サンプル生成")
@@ -148,7 +160,7 @@ with tab_sampling_finance:
     )
 
     with sample_col2:
-        st.plotly_chart(hist_fig, use_container_width=True)
+        st.plotly_chart(hist_fig, use_container_width=True, key="sample_histogram_chart")
 
     sample_mean = float(np.mean(samples))
     sample_std = float(np.std(samples, ddof=1))
@@ -190,7 +202,6 @@ with tab_sampling_finance:
             confidence_level=confidence_level,
             investment_amount=investment_amount,
         )
-
         param_var_return, param_var_amount = calculate_parametric_var(
             mu=return_mu,
             sigma=return_sigma,
@@ -211,7 +222,7 @@ with tab_sampling_finance:
         )
 
         with finance_col2:
-            st.plotly_chart(returns_fig, use_container_width=True)
+            st.plotly_chart(returns_fig, use_container_width=True, key="single_ticker_returns_histogram_chart")
 
         return_skew, return_excess_kurt = calculate_distribution_shape_metrics(returns)
         return_shape_comment = interpret_shape_metrics(return_skew, return_excess_kurt)
@@ -245,19 +256,15 @@ with tab_sampling_finance:
             intercept=qq_intercept,
             title=f"{ticker} のQQプロット",
         )
-        st.plotly_chart(qq_fig, use_container_width=True)
+        st.plotly_chart(qq_fig, use_container_width=True, key="single_ticker_qq_plot_chart")
 
         st.markdown("### ローリングボラティリティ")
-        rolling_vol = calculate_rolling_volatility(
-            returns=returns,
-            window=rolling_window,
-            annualization_factor=252,
-        )
+        rolling_vol = calculate_rolling_volatility(returns=returns, window=rolling_window, annualization_factor=252)
         rolling_fig = create_rolling_volatility_plot(
             rolling_vol=rolling_vol,
             title=f"{ticker} のローリングボラティリティ（{rolling_window}日）",
         )
-        st.plotly_chart(rolling_fig, use_container_width=True)
+        st.plotly_chart(rolling_fig, use_container_width=True, key="single_ticker_rolling_volatility_chart")
 
         latest_vol = float(rolling_vol.iloc[-1])
         avg_vol = float(rolling_vol.mean())
@@ -276,21 +283,18 @@ with tab_sampling_finance:
             cumulative_returns=cumulative_returns,
             title=f"{ticker} の累積リターン",
         )
-        st.plotly_chart(cum_fig, use_container_width=True)
+        st.plotly_chart(cum_fig, use_container_width=True, key="single_ticker_cumulative_return_chart")
 
         st.markdown("### 簡易 VaR 表示")
-
         var_col1, var_col2, var_col3 = st.columns(3)
         with var_col1:
             st.markdown("#### ヒストリカル VaR")
             st.write(f"**VaR リターン:** {hist_var_return:.6f}")
             st.write(f"**VaR 金額:** {hist_var_amount:,.2f}")
-
         with var_col2:
             st.markdown("#### パラメトリック VaR")
             st.write(f"**VaR リターン:** {param_var_return:.6f}")
             st.write(f"**VaR 金額:** {param_var_amount:,.2f}")
-
         with var_col3:
             var_gap = hist_var_amount - param_var_amount
             st.markdown("#### VaR差分")
@@ -314,33 +318,10 @@ with tab_sampling_finance:
             value="AAPL, MSFT, GOOGL",
             help="例: AAPL, MSFT, GOOGL または 7203.T, 6758.T, 9984.T",
         )
-        multi_period = st.selectbox(
-            "比較用データ期間",
-            options=["6mo", "1y", "2y", "5y"],
-            index=1,
-            key="multi_period",
-        )
-        multi_confidence_level = st.selectbox(
-            "比較用信頼水準",
-            options=[0.90, 0.95, 0.99],
-            index=1,
-            key="multi_confidence_level",
-        )
-        multi_investment_amount = st.number_input(
-            "比較用投資額",
-            min_value=1000.0,
-            value=1000000.0,
-            step=1000.0,
-            key="multi_investment_amount",
-        )
-        multi_rolling_window = st.slider(
-            "比較用ローリング窓幅（日数）",
-            min_value=5,
-            max_value=120,
-            value=20,
-            step=1,
-            key="multi_rolling_window",
-        )
+        multi_period = st.selectbox("比較用データ期間", options=["6mo", "1y", "2y", "5y"], index=1, key="multi_period")
+        multi_confidence_level = st.selectbox("比較用信頼水準", options=[0.90, 0.95, 0.99], index=1, key="multi_confidence_level")
+        multi_investment_amount = st.number_input("比較用投資額", min_value=1000.0, value=1000000.0, step=1000.0, key="multi_investment_amount")
+        multi_rolling_window = st.slider("比較用ローリング窓幅（日数）", min_value=5, max_value=120, value=20, step=1, key="multi_rolling_window")
 
     try:
         multi_tickers = parse_ticker_list(multi_ticker_text)
@@ -356,10 +337,7 @@ with tab_sampling_finance:
                 rolling_window=multi_rolling_window,
             )
 
-            returns_df = fetch_multi_return_df(
-                tickers=multi_tickers,
-                period=multi_period,
-            )
+            returns_df = fetch_multi_return_df(tickers=multi_tickers, period=multi_period)
             corr_df = calculate_correlation_matrix(returns_df)
             cumulative_returns_df = calculate_multi_cumulative_returns(returns_df)
 
@@ -368,7 +346,7 @@ with tab_sampling_finance:
                     rolling_vol_df=rolling_vol_df,
                     title=f"複数銘柄のローリングボラティリティ比較（{multi_rolling_window}日）",
                 )
-                st.plotly_chart(multi_roll_fig, use_container_width=True)
+                st.plotly_chart(multi_roll_fig, use_container_width=True, key="multi_ticker_rolling_volatility_chart")
 
             st.markdown("### 比較サマリー表")
             st.dataframe(summary_df, use_container_width=True)
@@ -378,14 +356,14 @@ with tab_sampling_finance:
                 cumulative_returns_df=cumulative_returns_df,
                 title="複数銘柄の累積リターン比較",
             )
-            st.plotly_chart(multi_cum_fig, use_container_width=True)
+            st.plotly_chart(multi_cum_fig, use_container_width=True, key="multi_ticker_cumulative_return_chart")
 
             st.markdown("### 相関行列")
             corr_fig = create_correlation_heatmap(
                 corr_df=corr_df,
                 title="複数銘柄の日次リターン相関行列",
             )
-            st.plotly_chart(corr_fig, use_container_width=True)
+            st.plotly_chart(corr_fig, use_container_width=True, key="multi_ticker_correlation_heatmap_chart")
             st.dataframe(corr_df, use_container_width=True)
 
             st.markdown("### 見方")
@@ -405,5 +383,190 @@ with tab_sampling_finance:
         with multi_col2:
             st.error(f"複数銘柄比較の処理に失敗しました: {e}")
 
+# =======================================================
+# シミュレーション
+# =======================================================
+with tab_simulation:
+    st.subheader("シミュレーション")
+
+    sim_tab1, sim_tab2 = st.tabs(
+        [
+            "中心極限定理",
+            "モンテカルロ法",
+        ]
+    )
+
+    with sim_tab1:
+        st.markdown("## 中心極限定理シミュレーション")
+        st.write(
+            """
+            母集団分布が正規分布でなくても、標本サイズを大きくすると
+            標本平均の分布が正規分布に近づいていく様子を確認します。
+            """
+        )
+
+        clt_col1, clt_col2 = st.columns([1, 2])
+
+        with clt_col1:
+            population_distribution = st.selectbox(
+                "母集団分布",
+                options=["一様分布", "指数分布", "ベルヌーイ分布"],
+                index=0,
+            )
+            clt_sample_size = st.slider("標本サイズ", min_value=2, max_value=200, value=30, step=1)
+            clt_num_trials = st.slider("試行回数", min_value=100, max_value=10000, value=3000, step=100)
+            clt_seed = st.number_input("乱数シード（CLT）", min_value=0, max_value=999999, value=123, step=1)
+
+        population_samples = generate_population_samples(
+            distribution_name=population_distribution,
+            size=5000,
+            random_seed=int(clt_seed),
+        )
+        sample_means = simulate_sample_means(
+            distribution_name=population_distribution,
+            sample_size=clt_sample_size,
+            num_trials=clt_num_trials,
+            random_seed=int(clt_seed),
+        )
+
+        population_fig = create_histogram_with_pdf(
+            samples=population_samples,
+            x_curve=np.array([]),
+            y_curve=np.array([]),
+            title=f"{population_distribution} の母集団サンプル",
+        )
+        population_fig.data = population_fig.data[:1]
+
+        clt_fig = create_clt_histogram(
+            sample_means=sample_means,
+            title=f"標本平均の分布（母集団: {population_distribution}, 標本サイズ: {clt_sample_size}）",
+        )
+
+        with clt_col2:
+            st.plotly_chart(population_fig, use_container_width=True, key="clt_population_distribution_chart")
+            st.plotly_chart(clt_fig, use_container_width=True, key="clt_sample_mean_histogram_chart")
+
+        clt_m1, clt_m2, clt_m3 = st.columns(3)
+        with clt_m1:
+            st.metric("母集団平均（サンプル近似）", f"{np.mean(population_samples):.4f}")
+        with clt_m2:
+            st.metric("標本平均の平均", f"{np.mean(sample_means):.4f}")
+        with clt_m3:
+            st.metric("標本平均の標準偏差", f"{np.std(sample_means, ddof=1):.4f}")
+
+        st.write(
+            """
+            **見方**
+            - 母集団分布が偏っていても、標本平均の分布はだんだん滑らかになります。
+            - 標本サイズを大きくすると、標本平均の分布はより正規分布らしい形になります。
+            """
+        )
+
+    with sim_tab2:
+        st.markdown("## モンテカルロ法")
+        mc_tab1, mc_tab2 = st.tabs(
+            [
+                "円周率の推定",
+                "正規分布の区間確率近似",
+            ]
+        )
+
+        with mc_tab1:
+            st.write("ランダムに点を打ち、単位円の内側に入る割合から円周率 π を推定します。")
+
+            pi_col1, pi_col2 = st.columns([1, 2])
+
+            with pi_col1:
+                num_points = st.slider("サンプル点数", min_value=100, max_value=50000, value=5000, step=100)
+                pi_seed = st.number_input("乱数シード（π推定）", min_value=0, max_value=999999, value=7, step=1)
+
+            pi_estimate, x_pi, y_pi, inside_mask = monte_carlo_pi(
+                num_points=num_points,
+                random_seed=int(pi_seed),
+            )
+
+            pi_fig = create_monte_carlo_pi_scatter(
+                x=x_pi,
+                y=y_pi,
+                inside_mask=inside_mask,
+                title="モンテカルロ法による円周率推定",
+            )
+
+            with pi_col2:
+                st.plotly_chart(pi_fig, use_container_width=True, key="monte_carlo_pi_scatter_chart")
+
+            pi_m1, pi_m2, pi_m3 = st.columns(3)
+            with pi_m1:
+                st.metric("推定された π", f"{pi_estimate:.6f}")
+            with pi_m2:
+                st.metric("真の π", f"{np.pi:.6f}")
+            with pi_m3:
+                st.metric("絶対誤差", f"{abs(pi_estimate - np.pi):.6f}")
+
+        with mc_tab2:
+            st.write("正規分布の区間確率を、乱数シミュレーションで近似します。")
+
+            mc_prob_col1, mc_prob_col2 = st.columns([1, 2])
+
+            with mc_prob_col1:
+                mc_mu = st.slider("平均 μ（モンテカルロ）", min_value=-5.0, max_value=5.0, value=0.0, step=0.1)
+                mc_sigma = st.slider("標準偏差 σ（モンテカルロ）", min_value=0.1, max_value=5.0, value=1.0, step=0.1)
+                mc_lower = st.number_input("下限（モンテカルロ）", value=-1.0, step=0.1)
+                mc_upper = st.number_input("上限（モンテカルロ）", value=1.0, step=0.1)
+                mc_num_samples = st.slider("乱数サンプル数", min_value=100, max_value=100000, value=10000, step=100)
+                mc_seed = st.number_input("乱数シード（区間確率）", min_value=0, max_value=999999, value=99, step=1)
+
+                if mc_lower > mc_upper:
+                    mc_lower, mc_upper = mc_upper, mc_lower
+
+            analytical_prob = interval_probability(
+                lower=mc_lower,
+                upper=mc_upper,
+                mu=mc_mu,
+                sigma=mc_sigma,
+            )
+            mc_estimated_prob = monte_carlo_normal_interval_probability(
+                mu=mc_mu,
+                sigma=mc_sigma,
+                lower=mc_lower,
+                upper=mc_upper,
+                num_samples=mc_num_samples,
+                random_seed=int(mc_seed),
+            )
+
+            x_mc = generate_x_range(mu=mc_mu, sigma=mc_sigma)
+            y_mc = normal_pdf(x_mc, mc_mu, mc_sigma)
+            mc_prob_fig = create_distribution_figure(
+                x=x_mc,
+                y=y_mc,
+                mu=mc_mu,
+                sigma=mc_sigma,
+                lower=mc_lower,
+                upper=mc_upper,
+                mode="PDF",
+            )
+
+            with mc_prob_col2:
+                st.plotly_chart(mc_prob_fig, use_container_width=True, key="mc_normal_interval_probability_chart")
+
+            mc_m1, mc_m2, mc_m3 = st.columns(3)
+            with mc_m1:
+                st.metric("理論値", f"{analytical_prob:.6f}")
+            with mc_m2:
+                st.metric("モンテカルロ推定値", f"{mc_estimated_prob:.6f}")
+            with mc_m3:
+                st.metric("絶対誤差", f"{abs(analytical_prob - mc_estimated_prob):.6f}")
+
+            st.write(
+                """
+                **見方**
+                - サンプル数を増やすほど、モンテカルロ推定値は理論値に近づきやすくなります。
+                - これは、乱数を使って確率や面積を近似する基本的な考え方です。
+                """
+            )
+
+# =======================================================
+# 解説ノート
+# =======================================================
 with tab_notes:
     render_notes_tab()
