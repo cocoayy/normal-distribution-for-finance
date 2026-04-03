@@ -16,10 +16,13 @@ from stats_utils import (
     interpret_shape_metrics,
     calculate_qq_plot_data,
     calculate_rolling_volatility,
+    calculate_cumulative_returns,
+    calculate_max_drawdown,
     parse_ticker_list,
     build_multi_ticker_summary,
     fetch_multi_return_df,
     calculate_correlation_matrix,
+    calculate_multi_cumulative_returns,
 )
 from plots import (
     create_distribution_figure,
@@ -29,6 +32,8 @@ from plots import (
     create_rolling_volatility_plot,
     create_multi_rolling_volatility_plot,
     create_correlation_heatmap,
+    create_cumulative_return_plot,
+    create_multi_cumulative_return_plot,
 )
 from notes import render_notes_tab
 
@@ -46,7 +51,8 @@ st.write(
     """
     このアプリでは、平均や標準偏差の変更、区間確率、PDF/CDF の可視化に加えて、
     サンプル生成、金融リターン比較、歪度・尖度、QQプロット、ローリングボラティリティ、
-    複数銘柄比較、相関行列、簡易 VaR 分析を通して、正規分布と金融リスクを対話的に理解できます。
+    複数銘柄比較、相関行列、累積リターン比較、簡易 VaR 分析を通して、
+    正規分布と金融リスクを対話的に理解できます。
     """
 )
 
@@ -210,7 +216,11 @@ with tab_sampling_finance:
         return_skew, return_excess_kurt = calculate_distribution_shape_metrics(returns)
         return_shape_comment = interpret_shape_metrics(return_skew, return_excess_kurt)
 
-        r1, r2, r3, r4 = st.columns(4)
+        cumulative_returns = calculate_cumulative_returns(returns)
+        latest_cumulative_return = float(cumulative_returns.iloc[-1])
+        max_drawdown = calculate_max_drawdown(cumulative_returns)
+
+        r1, r2, r3, r4, r5, r6 = st.columns(6)
         with r1:
             st.metric("平均リターン", f"{return_mu:.6f}")
         with r2:
@@ -219,6 +229,10 @@ with tab_sampling_finance:
             st.metric("歪度", f"{return_skew:.4f}")
         with r4:
             st.metric("超過尖度", f"{return_excess_kurt:.4f}")
+        with r5:
+            st.metric("累積リターン", f"{latest_cumulative_return:.4f}")
+        with r6:
+            st.metric("最大ドローダウン", f"{max_drawdown:.4f}")
 
         st.write(f"**分布コメント:** {return_shape_comment}")
 
@@ -256,6 +270,13 @@ with tab_sampling_finance:
             st.metric("平均ボラティリティ", f"{avg_vol:.4f}")
         with rv3:
             st.metric("最大ボラティリティ", f"{max_vol:.4f}")
+
+        st.markdown("### 累積リターン")
+        cum_fig = create_cumulative_return_plot(
+            cumulative_returns=cumulative_returns,
+            title=f"{ticker} の累積リターン",
+        )
+        st.plotly_chart(cum_fig, use_container_width=True)
 
         st.markdown("### 簡易 VaR 表示")
 
@@ -340,6 +361,7 @@ with tab_sampling_finance:
                 period=multi_period,
             )
             corr_df = calculate_correlation_matrix(returns_df)
+            cumulative_returns_df = calculate_multi_cumulative_returns(returns_df)
 
             with multi_col2:
                 multi_roll_fig = create_multi_rolling_volatility_plot(
@@ -350,6 +372,13 @@ with tab_sampling_finance:
 
             st.markdown("### 比較サマリー表")
             st.dataframe(summary_df, use_container_width=True)
+
+            st.markdown("### 累積リターン比較")
+            multi_cum_fig = create_multi_cumulative_return_plot(
+                cumulative_returns_df=cumulative_returns_df,
+                title="複数銘柄の累積リターン比較",
+            )
+            st.plotly_chart(multi_cum_fig, use_container_width=True)
 
             st.markdown("### 相関行列")
             corr_fig = create_correlation_heatmap(
@@ -365,6 +394,8 @@ with tab_sampling_finance:
                 - **平均リターン** が高いほど、その期間の平均的な収益率は高いです。
                 - **標準偏差** や **直近ローリングボラティリティ** が大きいほど、変動性が高いです。
                 - **超過尖度** が大きいほど、極端な値が出やすい傾向があります。
+                - **累積リターン** が高いほど、その期間全体での成績が良いです。
+                - **最大ドローダウン** がより負に大きいほど、途中の下落が大きいです。
                 - **VaR 金額** が大きいほど、損失見積もりが大きいことを意味します。
                 - **相関係数** が高いほど、銘柄同士が似た動きをしやすいです。
                 """
