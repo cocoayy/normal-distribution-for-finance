@@ -415,3 +415,99 @@ def create_multi_cumulative_return_plot(
     )
 
     return fig
+
+
+# =========================================================
+# シミュレーション用
+# =========================================================
+def create_clt_histogram(
+    sample_means: np.ndarray,
+    title: str,
+    nbins: int = 40,
+) -> go.Figure:
+    """
+    中心極限定理用の標本平均ヒストグラムを作成する。
+    """
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Histogram(
+            x=sample_means,
+            nbinsx=nbins,
+            histnorm="probability density",
+            name="標本平均のヒストグラム",
+            opacity=0.8,
+        )
+    )
+
+    fig.update_layout(
+        title=title,
+        xaxis_title="標本平均",
+        yaxis_title="密度",
+        template="plotly_white",
+        legend_title="凡例",
+    )
+
+    return fig
+
+
+def create_monte_carlo_pi_scatter(
+    x: np.ndarray,
+    y: np.ndarray,
+    inside_mask: np.ndarray,
+    title: str,
+    max_points_to_plot: int = 3000,
+) -> go.Figure:
+    """
+    モンテカルロ法による円周率推定用の散布図を作成する。
+    点が多すぎると重いので、表示点数は制限する。
+    """
+    if len(x) > max_points_to_plot:
+        x = x[:max_points_to_plot]
+        y = y[:max_points_to_plot]
+        inside_mask = inside_mask[:max_points_to_plot]
+
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Scatter(
+            x=x[inside_mask],
+            y=y[inside_mask],
+            mode="markers",
+            name="円の内側",
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=x[~inside_mask],
+            y=y[~inside_mask],
+            mode="markers",
+            name="円の外側",
+        )
+    )
+
+    theta = np.linspace(0, 2 * np.pi, 400)
+    circle_x = np.cos(theta)
+    circle_y = np.sin(theta)
+
+    fig.add_trace(
+        go.Scatter(
+            x=circle_x,
+            y=circle_y,
+            mode="lines",
+            name="単位円",
+        )
+    )
+
+    fig.update_layout(
+        title=title,
+        xaxis_title="x",
+        yaxis_title="y",
+        template="plotly_white",
+        legend_title="凡例",
+        yaxis_scaleanchor="x",
+        yaxis_scaleratio=1,
+    )
+
+    return fig
