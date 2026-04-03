@@ -170,6 +170,42 @@ def calculate_rolling_volatility(
     return rolling_vol.dropna()
 
 
+def calculate_cumulative_returns(returns: pd.Series) -> pd.Series:
+    """
+    累積リターンを計算する。
+
+    定義:
+        cumulative_t = (1 + r_1)(1 + r_2)...(1 + r_t) - 1
+    """
+    cumulative = (1.0 + returns).cumprod() - 1.0
+    cumulative.name = f"{returns.name}_cumulative_return" if returns.name else "cumulative_return"
+    return cumulative
+
+
+def calculate_drawdown(cumulative_returns: pd.Series) -> pd.Series:
+    """
+    累積リターン系列からドローダウン系列を計算する。
+
+    Notes
+    -----
+    wealth_index = 1 + cumulative_returns
+    drawdown = wealth / wealth の過去最大値 - 1
+    """
+    wealth_index = 1.0 + cumulative_returns
+    running_max = wealth_index.cummax()
+    drawdown = wealth_index / running_max - 1.0
+    drawdown.name = f"{cumulative_returns.name}_drawdown" if cumulative_returns.name else "drawdown"
+    return drawdown
+
+
+def calculate_max_drawdown(cumulative_returns: pd.Series) -> float:
+    """
+    最大ドローダウンを返す。
+    """
+    drawdown = calculate_drawdown(cumulative_returns)
+    return float(drawdown.min())
+
+
 def parse_ticker_list(ticker_text: str) -> list[str]:
     """
     カンマ区切りの文字列から銘柄コードリストを生成する。
@@ -208,6 +244,14 @@ def calculate_correlation_matrix(returns_df: pd.DataFrame) -> pd.DataFrame:
     return corr_df
 
 
+def calculate_multi_cumulative_returns(returns_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    複数銘柄の日次リターン DataFrame から累積リターン DataFrame を計算する。
+    """
+    cumulative_df = (1.0 + returns_df).cumprod() - 1.0
+    return cumulative_df
+
+
 def build_multi_ticker_summary(
     tickers: list[str],
     period: str,
@@ -225,6 +269,7 @@ def build_multi_ticker_summary(
         returns = fetch_return_series(ticker=ticker, period=period)
         mu, sigma = fit_normal_to_returns(returns)
         skewness, excess_kurt = calculate_distribution_shape_metrics(returns)
+
         hist_var_return, hist_var_amount = calculate_var_from_returns(
             returns=returns,
             confidence_level=confidence_level,
@@ -236,8 +281,13 @@ def build_multi_ticker_summary(
             confidence_level=confidence_level,
             investment_amount=investment_amount,
         )
+
         rolling_vol = calculate_rolling_volatility(returns=returns, window=rolling_window)
         latest_rolling_vol = float(rolling_vol.iloc[-1])
+
+        cumulative_returns = calculate_cumulative_returns(returns)
+        latest_cumulative_return = float(cumulative_returns.iloc[-1])
+        max_drawdown = calculate_max_drawdown(cumulative_returns)
 
         summary_rows.append(
             {
@@ -246,6 +296,8 @@ def build_multi_ticker_summary(
                 "標準偏差": sigma,
                 "歪度": skewness,
                 "超過尖度": excess_kurt,
+                "累積リターン": latest_cumulative_return,
+                "最大ドローダウン": max_drawdown,
                 "ヒストリカルVaR(リターン)": hist_var_return,
                 "ヒストリカルVaR(金額)": hist_var_amount,
                 "パラメトリックVaR(リターン)": param_var_return,

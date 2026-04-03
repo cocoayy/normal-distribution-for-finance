@@ -356,3 +356,62 @@ def create_correlation_heatmap(
     )
 
     return fig
+
+
+def create_cumulative_return_plot(
+    cumulative_returns: pd.Series,
+    title: str,
+) -> go.Figure:
+    """
+    単一銘柄の累積リターン時系列グラフを作成する。
+    """
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Scatter(
+            x=cumulative_returns.index,
+            y=cumulative_returns.values,
+            mode="lines",
+            name="累積リターン",
+        )
+    )
+
+    fig.update_layout(
+        title=title,
+        xaxis_title="日付",
+        yaxis_title="累積リターン",
+        template="plotly_white",
+        legend_title="凡例",
+    )
+
+    return fig
+
+
+def create_multi_cumulative_return_plot(
+    cumulative_returns_df: pd.DataFrame,
+    title: str,
+) -> go.Figure:
+    """
+    複数銘柄の累積リターン比較グラフを作成する。
+    """
+    fig = go.Figure()
+
+    for column in cumulative_returns_df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=cumulative_returns_df.index,
+                y=cumulative_returns_df[column],
+                mode="lines",
+                name=column,
+            )
+        )
+
+    fig.update_layout(
+        title=title,
+        xaxis_title="日付",
+        yaxis_title="累積リターン",
+        template="plotly_white",
+        legend_title="銘柄",
+    )
+
+    return fig
